@@ -1,6 +1,6 @@
 <?php
 /*
-     Author: James.Shi
+    Author: James.Shi
     Date: 2014-11-24 12:11
 */
 
@@ -239,11 +239,9 @@ class wechatCallbackapiTest
         }
 		
         // 获取结果 
-		$content = "学号           姓名      组号\n";
-        foreach ($data as $key => $value) {
-            # code...
-             $content = $content . $value . " ";
-        }
+		$content = $content . "学号：" . $data['sid'] . "\n";
+		$content = $content . "姓名：" . $data['name'] . "\n";
+		$content = $content . "组号：" . $data['gid'] . "\n";
 		
 		$result = $this->transmitText($object, $content);
         return $result;
