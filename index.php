@@ -56,83 +56,31 @@ class wechatCallbackapiTest
 
         if (!empty($postStr)){
             $postObj = simplexml_load_string($postStr, 'SimpleXMLElement', LIBXML_NOCDATA);
-            // $RX_TYPE = trim($postObj->MsgType);
-
-            // switch ($RX_TYPE) {
-            //     case "event":
-            //         # code...
-            //         $result = $this->receiveEvent($postObj);
-            //         break;
-            //     case "text":
-            //         $result = $this->receiveText($postObj);
-            //         break;
-            //     default:
-            //         # code...
-            //         break;
-            // }
-            // echo $retult;
             
-
-            $fromUsername = $postObj->FromUserName;
-            $toUsername = $postObj->ToUserName;
-            $keyword = trim($postObj->Content);
-            $content = $keyword; //
-            $time = time();
-            $textTpl = "<xml>
-                        <ToUserName><![CDATA[%s]]></ToUserName>
-                        <FromUserName><![CDATA[%s]]></FromUserName>
-                        <CreateTime>%s</CreateTime>
-                        <MsgType><![CDATA[%s]]></MsgType>
-                        <Content><![CDATA[%s]]></Content>
-                        <FuncFlag>0</FuncFlag>
-                        </xml>";
-            
-            $flag = strstr($content, "Middle");
-            if ($flag) {
-                $msgType = "text";
-                $ID = substr($content, 6);
-                $result = $this->getMark($ID);
-                $resultStr = sprintf($textTpl, $fromUsername, $toUsername, $time, $msgType, $result);
-                echo $resultStr;
-            } elseif($keyword == "?" || $keyword == "？" || $keyword == "帮助")
-            {
-                // 保存这个比较好，稳定以后再修改。
-                $msgType = "text";
-                //$contentStr = date("Y-m-d H:i:s",time());
-                $contentStr = "Help:\nSend student id, you can get a middle score with a valid student id. Like this:\nMiddle 3120000123\n" . 
-                "\n帮助：\n输入代码，执行相应操作。若没有绑定账号，需要先绑定账号。
-                \n0--绑定账号\n1--期中成绩\n2--实验2成绩\n3--实验3成绩\n4--Bonus成绩\n\n绑定账号格式为\n0 1230000123 张航";
-                $resultStr = sprintf($textTpl, $fromUsername, $toUsername, $time, $msgType, $contentStr);
-                echo $resultStr;
-                
-            } else {
-                // for compatibility, just put it here temprary
-
-                /*---------------------*/
-                $RX_TYPE = trim($postObj->MsgType);
-                switch ($RX_TYPE) {
-                case "event":
-                    # code...
-                    $result = $this->receiveEvent($postObj);
-                    break;
-                case "text":
-                    $result = $this->receiveText($postObj);
-                    break;
-                default:
-                    # code...
-                    break;
-                }
-                echo $result;  // result 打错了，调了好久
-                /*---------------------*/
-
-            }
+			/*---------------------*/
+			$RX_TYPE = trim($postObj->MsgType);
+			switch ($RX_TYPE) {
+			case "event":
+				# code...
+				$result = $this->receiveEvent($postObj);
+				break;
+			case "text":
+				$result = $this->receiveText($postObj);
+				break;
+			default:
+				# code...
+				$result = $this->receiveOthers($postObj);
+				break;
+			}
+			echo $result;  // result 打错了，调了好久
+			/*---------------------*/
         }else{
             echo "";
             exit;
         }
     }
-    
-    // old function
+	
+    // super function
     // function: get student's score
     // $ID: student's id
     private function getMark($ID)
@@ -157,7 +105,14 @@ class wechatCallbackapiTest
         return $result;
     }
 
-
+	// function: response to pic or vedio msg
+	// $object: post object
+	private function receiveOthers($object)
+	{
+		$content = "无法识别发送的信息";
+		$result = $this->transmitText($object, $content);
+		return $result;
+	}
 
     // function: receive a event
     // $object: post object
@@ -177,10 +132,9 @@ class wechatCallbackapiTest
         return $result;
     }
 
-    // function: 
+    // function: the type of msg is text
     private function receiveText($object)
     {
-        // 不能使用switch
         // 不能使用switch
         $cont = explode(" ", trim($object->Content));
         $keyword = $cont[0];
@@ -211,8 +165,8 @@ class wechatCallbackapiTest
         return $result;
     }
 
-
     // function: bind account
+	// $object: post object
     private function bindAccount($object) 
     {
         // bind
@@ -255,12 +209,10 @@ class wechatCallbackapiTest
         return $result;
     }
 
-
-    // new function
     // function: get middle and finall score
+	// $object: post object
     private function getScore($object)
     {
-        
         $wxaccount = trim($object->FromUserName);
         $sql = "select midmark from bds_2014_autumn_mark where wxid='{$wxaccount}'";
         
@@ -285,6 +237,7 @@ class wechatCallbackapiTest
 
 
     // function: get project2's comment
+	// $object: post object
     private function getProject2($object)
     {
         $wxaccount = trim($object->FromUserName);
@@ -327,6 +280,7 @@ class wechatCallbackapiTest
     
     
     // function: get project3's comment
+	// $object: post object
     private function getProject3($object)
     {
         $wxaccount = trim($object->FromUserName);
@@ -364,12 +318,12 @@ class wechatCallbackapiTest
 
         // test
         // $content = $wxaccount;
-
         $result = $this->transmitText($object, $content);
         return $result;
     }
     
     // function: get Bonus
+	// $object: post object
 	private function getBonus($object)
 	{
         // $result = $this->transmitText($object, "更新数据库，暂不提供");
@@ -417,6 +371,7 @@ class wechatCallbackapiTest
 	}
 
     // function: send help info
+	// $object: post object
     private function transmitHelp($object) 
     {
         $content = "帮助：\n输入代码，执行相应操作。若没有绑定账号，需要先绑定账号。" 
@@ -426,6 +381,7 @@ class wechatCallbackapiTest
     }
 
     // function：send text info: $content
+	// $object: post object
     private function transmitText($object, $content)
     {
         // text template
@@ -444,6 +400,7 @@ class wechatCallbackapiTest
     }
 
     // function: test other function
+	// $object: post object
     private function testFunction($object)
     {
         $wxaccount = trim($object->FromUserName);
