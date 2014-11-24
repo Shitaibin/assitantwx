@@ -1,4 +1,3 @@
-/* i want to change it*/
 <?php
 /*
      Author: James.Shi
@@ -9,12 +8,15 @@
 	Function Blog
 	
 	alter help module. 11/24/2014
-	
+	alter bind. 11/24/2014
+	add query bind info. 11/24/2014
 	
 */
 
 define("TOKEN", "weixin");
+
 $wechatObj = new wechatCallbackapiTest();
+
 if (isset($_GET['echostr'])) {
     $wechatObj->valid();
 }else{
@@ -57,8 +59,6 @@ class wechatCallbackapiTest
 
         if (!empty($postStr)){
             $postObj = simplexml_load_string($postStr, 'SimpleXMLElement', LIBXML_NOCDATA);
-            
-			/*---------------------*/
 			$RX_TYPE = trim($postObj->MsgType);
 			switch ($RX_TYPE) {
 			case "event":
@@ -74,9 +74,8 @@ class wechatCallbackapiTest
 				break;
 			}
 			echo $result;  // result 打错了，调了好久
-			/*---------------------*/
         }else{
-            echo "";
+            echo "what's this!?";
             exit;
         }
     }
@@ -144,14 +143,8 @@ class wechatCallbackapiTest
         } elseif($keyword == "0") {
             $result = $this->bindAccount($object);
         } elseif($keyword == "1") {
-            $result = $this->getScore($object);
-        } elseif($keyword == "2") {
-            $result = $this->getProject2($object);
-        } elseif($keyword == "3") {
-        	$result = $this->getProject3($object);
-        } elseif($keyword == "4") {
-			$result = $this->getBonus($object);
-		} else {
+            $result = $this->bindQuery($object);
+        } else {
             $result = $this->transmitHelp($object);
         }
         
@@ -171,18 +164,20 @@ class wechatCallbackapiTest
     private function bindAccount($object) 
     {
         // bind
-        // content: [0 3130000313 石中]
+        // content: [0 3130000313 名字 组号 电话 邮箱]
         $user = explode(" ", trim($object->Content));
         $bindwxid = $object->FromUserName;
-        if (count($user) < 3) 
+        if (count($user) < 6) 
         {  
-            $content = "格式为: 0 学号 姓名\n";
+            $content = "1. 组号是纯数字，不带字母。\n2. 放心吧，哥不会泄露你们的个人信息。"
+                . "\n[3. 不要绑定其他同学的学号等，因为不提供解绑.]"
+                . "\n\n绑定账号格式如下，用空格分开:\n0 学号 姓名 组号 电话 邮箱";
             $result = $this->transmitText($object, $content);
             return $result;
         }
 
         // 信息完整
-        $sql = "select wxid from bds_2014_autumn_mark where studentid = '$user[1]' and name = '$user[2]' ";
+        $sql = "select id from 2014_winter_ads_info where sid = '$user[1]' and name = '$user[2]' ";
         $mysql = new SaeMysql();
         $data = $mysql->getLine($sql);
         $content = "";
@@ -190,27 +185,69 @@ class wechatCallbackapiTest
         {
             $content = "查无此人，请核实学号和姓名.\n";
         } else {
-            // 存在此人,执行绑定
-            $sql = "update bds_2014_autumn_mark set wxid = '$bindwxid' where studentid = '$user[1]' and name = '$user[2]' ";
-            $mysql->runSql($sql);
-            $rows = $mysql->affectedRows();
-            if ($mysql->errno() != 0)
-            {
-                die("Error:" . $mysql->errmsg());
-                $content = "出现错误，绑定失败，请邮箱联系助教.\n";
-            } else {
-                $content = "绑定成功.\n";
-            }
+            // 查看是否已经绑定
+			
+			$sql = "select id from 2014_winter_ads_info where wxid = '$bindwxid'";
+			$data = $mysql->getline($sql);
+			if (empty($data))
+			{
+				// 此微信号没有绑定
+				$sql = "update 2014_winter_ads_info set wxid = '$bindwxid', gid = '$user[3]', "
+					. " phone = '$user[4]', email = '$user[5]' where sid = '$user[1]' and name = '$user[2]' ";
+				$mysql->runsql($sql);
+				$rows = $mysql->affectedrows();
+				if ($mysql->errno() != 0)
+				{
+					die("error:" . $mysql->errmsg());
+					$content = "出现错误，绑定失败，请邮箱联系助教.\n";
+				} else {
+					$content = "绑定成功.\n";
+				}
+			} else 
+			{
+				$content = "此微信号已绑定，回复1,查看绑定信息，若不是自己信息，请邮箱联系助教.\n";
+			}
         }
            
         $mysql->closeDb();
-
         // return info
+		
         $result = $this->transmitText($object, $content);
         return $result;
     }
 
-    // function: get middle and finall score
+	private function bindQuery($object)
+	{
+		$wxaccount = trim($object->FromUserName);
+		$sql = "select sid, name, gid from 2014_winter_ads_info where wxid = '$wxaccount'";
+		$mysql = new SaeMysql();
+		$data = $mysql->getLine($sql);
+		// 检查是否出现错误
+        if ($mysql->errno() != 0)
+        {
+            die("Error:" . $mysql->errmsg());
+            $content = "出现错误，请邮箱联系助教.\n";
+            $result = $this->transmitText($object, $content);
+            return $result;
+        }
+
+		if (empty($data))
+        {
+            $content = "请先绑定账号，再查询成绩。回复‘h’查看帮助。";
+        }
+		
+        // 获取结果 
+		$content = "学号           姓名      组号\n";
+        foreach ($data as $key => $value) {
+            # code...
+             $content = $content . $value . " ";
+        }
+		
+		$result = $this->transmitText($object, $content);
+        return $result;
+	}
+	
+    // function: get middle score
 	// $object: post object
     private function getScore($object)
     {
@@ -235,54 +272,10 @@ class wechatCallbackapiTest
         $result = $this->transmitText($object, $content);
         return $result;
     }
-
-
-    // function: get project2's comment
-	// $object: post object
-    private function getProject2($object)
-    {
-        $wxaccount = trim($object->FromUserName);
-        $sql = "select p2addr 
-        from bds_2014_autumn_project 
-        join bds_2014_autumn_mark 
-        on bds_2014_autumn_project.studentid = bds_2014_autumn_mark.studentid 
-        where bds_2014_autumn_mark.wxid = '$wxaccount' ";
-        
-        $mysql = new SaeMysql();
-        $data = $mysql->getLine($sql);
-        // 检查是否出现错误
-        if ($mysql->errno() != 0)
-        {
-            die("Error:" . $mysql->errmsg());
-            $content = "出现错误，请邮箱联系助教.\n";
-            $result = $this->transmitText($object, $content);
-            return $result;
-        }
-
-        // 获取结果
-        foreach ($data as $key => $value) {
-            # code...
-            $content = "点击链接查看结果\n" . $value;
-        }
-
-        // 没有查到信息
-        if (empty($data))
-        {
-            $content = "请先绑定账号，再查询成绩。回复‘h’查看帮助。";
-            //$content = $sql;  // debug
-        }
-
-        // test
-        // $content = $wxaccount;
-
-        $result = $this->transmitText($object, $content);
-        return $result;
-    }
     
-    
-    // function: get project3's comment
+    // function: get project's comment
 	// $object: post object
-    private function getProject3($object)
+    private function getProject($object)
     {
         $wxaccount = trim($object->FromUserName);
         $sql = "select gid 
@@ -302,6 +295,13 @@ class wechatCallbackapiTest
             return $result;
         }
 
+		// 没有查到信息
+        if (empty($data))
+        {
+            $content = "请先绑定账号，再查询成绩。回复‘h’查看帮助。";
+            //$content = $sql;  // debug
+        }
+		
         // 获取结果
         foreach ($data as $key => $value) {
             # code...
@@ -310,73 +310,18 @@ class wechatCallbackapiTest
 		$httppath = "http://1.jamesappbds.sinaapp.com/P3/" . $gidvar . ".htm";
         $content = "点击链接查看结果\n". $httppath;
         
-        // 没有查到信息
-        if (empty($data))
-        {
-            $content = "请先绑定账号，再查询成绩。回复‘h’查看帮助。";
-            //$content = $sql;  // debug
-        }
-
         // test
         // $content = $wxaccount;
         $result = $this->transmitText($object, $content);
         return $result;
     }
-    
-    // function: get Bonus
-	// $object: post object
-	private function getBonus($object)
-	{
-        // $result = $this->transmitText($object, "更新数据库，暂不提供");
-        // return $result;
-        
-		$wxaccount = trim($object->FromUserName);
-        $sql = "select id,bds_2014_autumn_bonus.name,b1,b2,sum 
-        from bds_2014_autumn_bonus 
-        join bds_2014_autumn_mark 
-        on bds_2014_autumn_bonus.id = bds_2014_autumn_mark.studentid 
-        where bds_2014_autumn_mark.wxid = '$wxaccount' ";
-        
-        $mysql = new SaeMysql();
-        $data = $mysql->getLine($sql);
-        // 检查是否出现错误
-        if ($mysql->errno() != 0)
-        {
-            die("Error:" . $mysql->errmsg());
-            $content = "出现错误，请邮箱联系助教.\n";
-            $result = $this->transmitText($object, $content);
-            return $result;
-        }
-
-		$content = "Bonus之前已在微信公布，现在Bonus已处理完毕，不再提交和补交。"
-			. "若果b1或b2后面显示为空，则代表该题目没有成绩。\n\n";
-        // 获取结果
-        foreach ($data as $key => $value) {
-            # code...
-			$str = $key . " : " . $value . "\n";
-			$content = $content . $str;
-        }
-        
-        // 没有查到信息
-        if (empty($data))
-        {
-            $content = "请先绑定账号，再查询成绩。回复‘h’查看帮助。";
-            $content = $sql;  // debug
-        }
-
-        // test
-        // $content = $wxaccount;
-
-        $result = $this->transmitText($object, $content);
-        return $result;
-	}
 
     // function: send help info
 	// $object: post object
     private function transmitHelp($object) 
     {
-        $content = "帮助：\n输入代码，执行相应操作。若没有绑定账号，需要先绑定账号。" 
-            . "\n0--绑定账号\n1--期中成绩\n2--实验2成绩\n3--实验3成绩\n4--Bonus成绩\n\n绑定账号格式为\n0 1230000123 张航";
+        $content = "帮助：\n\n输入代码，执行相应操作。若没有绑定账号，需要先绑定账号。" 
+            . "\n\n==================\n\n0 -- 绑定账号";
         $result = $this->transmitText($object, $content);
         return $result;
     }
@@ -404,40 +349,7 @@ class wechatCallbackapiTest
 	// $object: post object
     private function testFunction($object)
     {
-        $wxaccount = trim($object->FromUserName);
-        $sql = "select p2addr 
-        from bds_2014_autumn_project 
-        join bds_2014_autumn_mark 
-        on bds_2014_autumn_project.studentid = bds_2014_autumn_mark.studentid 
-        where bds_2014_autumn_mark.wxid = '$wxaccount' ";
-        
-        $mysql = new SaeMysql();
-        $data = $mysql->getLine($sql);
-        // 检查是否出现错误
-        if ($mysql->errno() != 0)
-        {
-            die("Error:" . $mysql->errmsg());
-            $content = "出现错误，请邮箱联系助教.\n";
-            $result = $this->transmitText($object, $content);
-            return $result;
-        }
-
-        // 获取结果
-        foreach ($data as $key => $value) {
-            # code...
-            $content = "点击链接查看结果\n" . $value;
-        }
-
-        // 没有查到信息
-        if (empty($data))
-        {
-            $content = "请先绑定账号，再查询成绩。回复‘h’查看帮助。";
-            //$content = $sql;  // debug
-        }
-
-        // test
-        // $content = $wxaccount;
-
+		$content = "test function";
         $result = $this->transmitText($object, $content);
         return $result;
     }
