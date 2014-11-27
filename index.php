@@ -177,13 +177,14 @@ class wechatCallbackapiTest
         }
 
         // 信息完整
-        $sql = "select id from 2014_winter_ads_info where sid = '$user[1]' and name = '$user[2]' ";
+        $sql = "select id from 2014_winter_ads_info where sid = '$user[1]' and name = '$user[2]' and gid = '$user[3]' ";
+        
         $mysql = new SaeMysql();
         $data = $mysql->getLine($sql);
         $content = "";
         if (empty($data)) 
         {
-            $content = "查无此人，请核实学号和姓名.\n";
+            $content = "查无此人，请核实学号、姓名、组号.\n";
         } else {
             // 查看是否已经绑定
 			
@@ -194,7 +195,7 @@ class wechatCallbackapiTest
 				// 此微信号没有绑定
 				$sql = "update 2014_winter_ads_info set wxid = '$bindwxid', gid = '$user[3]', "
 					. " phone = '$user[4]', email = '$user[5]' where sid = '$user[1]' and name = '$user[2]' ";
-				$mysql->runsql($sql);
+                $mysql->runsql($sql);
 				$rows = $mysql->affectedrows();
 				if ($mysql->errno() != 0)
 				{
@@ -221,7 +222,7 @@ class wechatCallbackapiTest
 	private function bindQuery($object)
 	{
 		$wxaccount = trim($object->FromUserName);
-		$sql = "select sid, name, gid from 2014_winter_ads_info where wxid = '$wxaccount'";
+		$sql = "select sid, name, gid, phone, email from 2014_winter_ads_info where wxid = '$wxaccount'";
 		$mysql = new SaeMysql();
 		$data = $mysql->getLine($sql);
 		// 检查是否出现错误
@@ -236,12 +237,15 @@ class wechatCallbackapiTest
 		if (empty($data))
         {
             $content = "请先绑定账号，再查询成绩。回复‘h’查看帮助。";
-        }
+        } else {
+			// 获取结果 
+			$content = $content . "学号：" . $data['sid'] . "\n";
+			$content = $content . "姓名：" . $data['name'] . "\n";
+			$content = $content . "组号：" . $data['gid'] . "\n";
+			$content = $content . "电话：" . $data['phone'] . "\n";
+			$content = $content . "邮箱：" . $data['email'] . "\n";
+		}
 		
-        // 获取结果 
-		$content = $content . "学号：" . $data['sid'] . "\n";
-		$content = $content . "姓名：" . $data['name'] . "\n";
-		$content = $content . "组号：" . $data['gid'] . "\n";
 		
 		$result = $this->transmitText($object, $content);
         return $result;
